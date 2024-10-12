@@ -151,6 +151,20 @@ pipeline {
                 }
             }
         }
+        stage('DAST Wapiti') {
+            agent {
+                docker {
+                    image 'xenjutsu/wapiti:3.2.0'
+                    args '--user root --network host --entrypoint='
+                }
+            }
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    sh 'wapiti -u http://$TARGET_IP:8080/WebGoat -f xml -o wapiti-report.xml'
+                }
+                archiveArtifacts artifacts: 'wapiti-report.xml'
+            }
+        }
         stage('DAST Nuclei') {
             agent {
                 docker {
