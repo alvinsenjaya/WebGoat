@@ -4,12 +4,15 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('DockerLogin')
         SNYK_CREDENTIALS = credentials('SnykToken')
         SONARQUBE_CREDENTIALS = credentials('SonarToken')
+        DEPLOY_USERNAME = 'jtf01645' // Deployment username variable
+        TARGET_IP = '192.168.1.19' // Target IP for deployment variable
+        SONARQUBE_IP = '192.168.1.19' // SonarQube IP variable
     }
     options {
         skipStagesAfterUnstable()
     }
     stages {
-    	stage('Secret Scanning Using Trufflehog') {
+        stage('Secret Scanning Using Trufflehog') {
             agent {
                 docker {
                     image 'trufflesecurity/trufflehog:latest'
@@ -51,10 +54,10 @@ pipeline {
         }
         stage('SCA Snyk Test') {
             agent {
-              docker {
-                  image 'snyk/snyk:node'
-                  args '-u root --network host --env SNYK_TOKEN=$SNYK_CREDENTIALS_PSW --entrypoint='
-              }
+                docker {
+                    image 'snyk/snyk:node'
+                    args '-u root --network host --env SNYK_TOKEN=$SNYK_CREDENTIALS_PSW --entrypoint='
+                }
             }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -66,10 +69,10 @@ pipeline {
         }
         stage('SCA Trivy Scan Dockerfile Misconfiguration') {
             agent {
-              docker {
-                  image 'aquasec/trivy:latest'
-                  args '-u root --network host --entrypoint='
-              }
+                docker {
+                    image 'aquasec/trivy:latest'
+                    args '-u root --network host --entrypoint='
+                }
             }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -81,10 +84,10 @@ pipeline {
         }
         stage('SAST Snyk') {
             agent {
-              docker {
-                  image 'snyk/snyk:node'
-                  args '-u root --network host --env SNYK_TOKEN=$SNYK_CREDENTIALS_PSW --entrypoint='
-              }
+                docker {
+                    image 'snyk/snyk:node'
+                    args '-u root --network host --env SNYK_TOKEN=$SNYK_CREDENTIALS_PSW --entrypoint='
+                }
             }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
@@ -95,14 +98,21 @@ pipeline {
         }
         stage('SAST SonarQube') {
             agent {
-              docker {
+                docker {
                     image 'maven:3.9.9-eclipse-temurin-21-alpine'
                     args '-u root --network host'
-              }
+                }
             }
             steps {
                 catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                    sh 'mvn sonar:sonar -Dsonar.token=$SONARQUBE_CREDENTIALS_PSW -Dsonar.projectKey=WebGoat -Dsonar.qualitygate.wait=true -Dsonar.host.url=http://192.168.0.105:9000 -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco-unit-test-coverage-report/jacoco.xml' 
+                    sh '''
+                    mvn sonar:sonar \
+                        -Dsonar.token=$SONARQUBE_CREDENTIALS_PSW \
+                        -Dsonar.projectKey=WebGoat \
+                        -Dsonar.qualitygate.wait=true \
+                        -Dsonar.host.url=http://$SONARQUBE_IP:9000 \
+                        -Dsonar.coverage.jacoco.xmlReportPaths=target/site/jacoco-unit-test-coverage-report/jacoco.xml
+                    '''
                 }
             }
         }
@@ -128,10 +138,14 @@ pipeline {
             }
             steps {
                 withCredentials([sshUserPrivateKey(credentialsId: "DeploymentSSHKey", keyFileVariable: 'keyfile')]) {
-                    sh 'ssh -i ${keyfile} -o StrictHostKeyChecking=no ubuntu@192.168.0.107 "echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin"'
-                    sh 'ssh -i ${keyfile} -o StrictHostKeyChecking=no ubuntu@192.168.0.107 docker pull xenjutsu/webgoat:0.1'
-                    sh 'ssh -i ${keyfile} -o StrictHostKeyChecking=no ubuntu@192.168.0.107 docker rm --force webgoat'
-                    sh 'ssh -i ${keyfile} -o StrictHostKeyChecking=no ubuntu@192.168.0.107 docker run -it --detach --network host --name webgoat xenjutsu/webgoat:0.1'
+                    sh '''
+                    ssh -i ${keyfile} -o StrictHostKeyChecking=no $DEPLOY_USERNAME@$TARGET_IP "
+                        echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin &&
+                        docker pull xenjutsu/webgoat:0.1 &&
+                        docker rm --force webgoat &&
+                        docker run -it --detach --network host --name webgoat xenjutsu/webgoat:0.1
+                    "
+                    '''
                 }
             }
         }
