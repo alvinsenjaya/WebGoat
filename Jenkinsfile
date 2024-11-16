@@ -4,9 +4,9 @@ pipeline {
         DOCKERHUB_CREDENTIALS = credentials('DockerLogin')
         SNYK_CREDENTIALS = credentials('SnykToken')
         SONARQUBE_CREDENTIALS = credentials('SonarToken')
-        DEPLOY_USERNAME = 'jtf01645' // Deployment username variable
-        TARGET_IP = '192.168.1.19' // Target IP for deployment variable
-        SONARQUBE_IP = '192.168.1.19' // SonarQube IP variable
+        DEPLOY_USERNAME = 'ubuntu' // Add deployment username
+        TARGET_IP = '192.168.0.17' // Add target IP for deployment
+        SONARQUBE_IP = '192.168.0.18' // Add SonarQube IP
     }
     options {
         skipStagesAfterUnstable()
