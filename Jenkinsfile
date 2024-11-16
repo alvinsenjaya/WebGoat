@@ -12,7 +12,6 @@ pipeline {
         skipStagesAfterUnstable()
     }
     stages {
-        /*
         stage('Secret Scanning Using Trufflehog') {
             agent {
                 docker {
@@ -130,7 +129,6 @@ pipeline {
                 sh 'docker push xenjutsu/webgoat:0.1'
             }
         }
-        */
         stage('Deploy Docker Image') {
             agent {
                 docker {
